@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT Random Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        #nftCanvas {
+            border: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        #buyButton {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #buyButton:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #timer {
+            font-size: 24px;
+            margin-top: 10px;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="nftCanvas" width="400" height="400"></canvas>
+    <button id="buyButton" onclick="buyNFT()">Buy NFT (0.01 BNB)</button>
+    <div id="timer">Time Left: Calculating...</div>
+    <div id="status"></div>
+
+    <script>
+        let web3;
+        let currentNFT = null;
+        const walletAddress = "0x4faA65cF04A31F7e30544D8ABC385bF1333c38Bf";
+        const price = "10000000000000000"; // 0.01 BNB in wei
+        const nftExpiration = 24 * 60 * 60 * 1000; // 24 hours in ms
+        const canvas = document.getElementById('nftCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Initialize Web3
+        async function initWeb3() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                } catch (error) {
+                    console.error("User denied account access");
+                    updateStatus("Please connect your wallet (Binance Chain)");
+                }
+            } else {
+                console.error("No Ethereum provider detected");
+                updateStatus("Please install MetaMask or another BNB-compatible wallet");
+            }
+        }
+
+        // Random number generator
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        // Generate random NFT image
+        function generateNewNFT() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Generate abstract pattern
+            const shapes = Math.floor(random(20, 50));
+            for (let i = 0; i < shapes; i++) {
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(${random(0, 255)}, ${random(0, 255)}, ${random(0, 255)}, ${random(0.5, 1)})`;
+                const x = random(0, canvas.width);
+                const y = random(0, canvas.height);
+                const size = random(10, 50);
+                if (Math.random() > 0.5) {
+                    ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+                } else {
+                    ctx.rect(x - size / 2, y - size / 2, size, size);
+                }
+                ctx.fill();
+            }
+
+            currentNFT = {
+                id: Date.now(),
+                createdAt: Date.now(),
+                imageData: canvas.toDataURL()
+            };
+            startTimer();
+            updateStatus("New NFT generated! Buy within 24 hours.");
+        }
+
+        // Add authenticity stamp
+        function addAuthenticityStamp() {
+            const stampText = `AUTH-${currentNFT.id}-${Math.floor(random(1000, 9999))}`;
+            ctx.font = '20px Arial';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            const x = random(20, canvas.width - 100);
+            const y = random(20, canvas.height - 20);
+            ctx.strokeText(stampText, x, y);
+            ctx.fillText(stampText, x, y);
+            currentNFT.imageData = canvas.toDataURL(); // Update image data with stamp
+        }
+
+        // Timer logic
+        function startTimer() {
+            const timerElement = document.getElementById('timer');
+            const updateTimer = () => {
+                const timeLeft = nftExpiration - (Date.now() - currentNFT.createdAt);
+                if (timeLeft <= 0) {
+                    deleteNFT();
+                    return;
+                }
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                timerElement.textContent = `Time Left: ${hours}h ${minutes}m ${seconds}s`;
+                setTimeout(updateTimer, 1000);
+            };
+            updateTimer();
+        }
+
+        // Delete expired NFT
+        function deleteNFT() {
+            currentNFT = null;
+            generateNewNFT();
+            updateStatus("Previous NFT expired. New NFT generated!");
+        }
+
+        // Buy NFT function
+        async function buyNFT() {
+            if (!web3 || !currentNFT) {
+                updateStatus("Please connect wallet or wait for NFT to load");
+                return;
+            }
+
+            const accounts = await web3.eth.getAccounts();
+            if (accounts.length === 0) {
+                updateStatus("No accounts found. Please connect your wallet.");
+                return;
+            }
+
+            document.getElementById('buyButton').disabled = true;
+            updateStatus("Processing transaction...");
+
+            try {
+                const transaction = await web3.eth.sendTransaction({
+                    from: accounts[0],
+                    to: walletAddress,
+                    value: price,
+                    chainId: 56 // BNB Chain mainnet
+                });
+
+                // Add stamp after successful purchase
+                addAuthenticityStamp();
+                updateStatus(`NFT purchased! Transaction hash: ${transaction.transactionHash}`);
+                generateNewNFT();
+            } catch (error) {
+                console.error(error);
+                updateStatus("Transaction failed. Please try again.");
+            } finally {
+                document.getElementById('buyButton').disabled = false;
+            }
+        }
+
+        // Update status message
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        // Initialize
+        initWeb3();
+        generateNewNFT();
+    </script>
+</body>
+</html>
