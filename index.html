@@ -51,7 +51,7 @@
 <body>
     <canvas id="nftCanvas" width="400" height="400"></canvas>
     <button id="connectButton" onclick="connectWallet()">Connect Wallet</button>
-    <button id="buyButton" onclick="buyNFT()" disabled>Buy NFT (0.01 BNB)</button>
+    <button id="buyButton" onclick="buyNFT()" disabled>Buy NFT (0.001 BNB)</button>
     <div id="timer">Time Left: Calculating...</div>
     <div id="status"></div>
 
@@ -60,7 +60,7 @@
         let currentNFT = null;
         let accounts = [];
         const walletAddress = "0x4faA65cF04A31F7e30544D8ABC385bF1333c38Bf";
-        const price = "10000000000000000"; // 0.01 BNB in wei
+        const price = "1000000000000000"; // 0.001 BNB in wei (was 0.01 BNB)
         const nftExpiration = 24 * 60 * 60 * 1000; // 24 hours in ms
         const canvas = document.getElementById('nftCanvas');
         const ctx = canvas.getContext('2d');
@@ -85,7 +85,7 @@
                     break;
                 }
                 console.log("Web3 provider not detected, retrying...", i + 1);
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
             if (!providerDetected) {
                 console.error("No Web3 provider detected after retries");
@@ -147,11 +147,38 @@
                     createdAt: Date.now(),
                     imageData: canvas.toDataURL()
                 };
+                // Save to localStorage
+                localStorage.setItem('currentNFT', JSON.stringify(currentNFT));
                 startTimer();
                 updateStatus("New NFT generated! Buy within 24 hours.");
             } catch (error) {
                 console.error("Error generating NFT:", error);
                 updateStatus("Failed to generate NFT. Please refresh the page.");
+            }
+        }
+
+        // Load NFT from localStorage if available
+        function loadNFT() {
+            const savedNFT = localStorage.getItem('currentNFT');
+            if (savedNFT) {
+                currentNFT = JSON.parse(savedNFT);
+                // Check if the NFT has expired
+                const timeLeft = nftExpiration - (Date.now() - currentNFT.createdAt);
+                if (timeLeft <= 0) {
+                    localStorage.removeItem('currentNFT');
+                    generateNewNFT();
+                } else {
+                    // Redraw the saved NFT
+                    const img = new Image();
+                    img.src = currentNFT.imageData;
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0);
+                        startTimer();
+                        updateStatus("NFT loaded! Buy within 24 hours.");
+                    };
+                }
+            } else {
+                generateNewNFT();
             }
         }
 
@@ -197,6 +224,7 @@
         // Delete expired NFT
         function deleteNFT() {
             currentNFT = null;
+            localStorage.removeItem('currentNFT');
             generateNewNFT();
             updateStatus("Previous NFT expired. New NFT generated!");
         }
@@ -221,6 +249,7 @@
 
                 addAuthenticityStamp();
                 updateStatus(`NFT purchased! Transaction hash: ${transaction.transactionHash}`);
+                localStorage.removeItem('currentNFT');
                 generateNewNFT();
             } catch (error) {
                 console.error("Transaction error:", error);
@@ -238,7 +267,7 @@
         // Initialize
         window.onload = () => {
             initWeb3();
-            generateNewNFT();
+            loadNFT();
         };
     </script>
 </body>
