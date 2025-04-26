@@ -69,15 +69,27 @@
 
         // Check for Web3 provider and initialize
         async function initWeb3() {
-            if (window.ethereum) {
-                web3 = new Web3(window.ethereum);
-                updateStatus("Web3 provider detected. Please connect your wallet.");
-            } else if (window.web3) {
-                web3 = new Web3(window.web3.currentProvider);
-                updateStatus("Legacy Web3 provider detected. Please connect your wallet.");
-            } else {
-                console.error("No Web3 provider detected");
-                updateStatus("Please install MetaMask or another BNB-compatible wallet to proceed.");
+            let providerDetected = false;
+            for (let i = 0; i < 5; i++) {
+                if (window.ethereum) {
+                    web3 = new Web3(window.ethereum);
+                    console.log("Web3 provider (window.ethereum) detected");
+                    updateStatus("Web3 provider detected. Please connect your wallet.");
+                    providerDetected = true;
+                    break;
+                } else if (window.web3) {
+                    web3 = new Web3(window.web3.currentProvider);
+                    console.log("Legacy Web3 provider (window.web3) detected");
+                    updateStatus("Legacy Web3 provider detected. Please connect your wallet.");
+                    providerDetected = true;
+                    break;
+                }
+                console.log("Web3 provider not detected, retrying...", i + 1);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+            }
+            if (!providerDetected) {
+                console.error("No Web3 provider detected after retries");
+                updateStatus("No Web3 provider detected. Please install MetaMask or another BNB-compatible wallet.");
                 connectButton.disabled = true;
             }
         }
@@ -114,7 +126,6 @@
             try {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-
                 const shapes = Math.floor(random(20, 50));
                 for (let i = 0; i < shapes; i++) {
                     ctx.beginPath();
@@ -130,9 +141,7 @@
                     ctx.fill();
                     ctx.closePath();
                 }
-
                 console.log("NFT generated with", shapes, "shapes");
-
                 currentNFT = {
                     id: Date.now(),
                     createdAt: Date.now(),
